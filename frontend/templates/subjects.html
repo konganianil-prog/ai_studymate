@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Subjects & Syllabus Units — AI STUDY MATE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">
+        <i class="bi bi-collection-fill text-primary me-2"></i> Academic Subjects & Units
+      </h3>
+      <p class="text-muted mb-0">Organize your syllabus, question papers, and study answers by course and unit module.</p>
+    </div>
+    <button class="btn btn-primary-gradient" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
+      <i class="bi bi-plus-circle-fill"></i> Add Custom Subject
+    </button>
+  </div>
+
+  <!-- Subjects Grid -->
+  <div class="row g-4" id="subjectsContainer">
+    {% for s in subjects %}
+    <div class="col-md-6 col-xl-4" id="subject-card-{{ s.id }}">
+      <div class="study-card h-100 d-flex flex-direction-column">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <div class="action-icon bg-primary bg-opacity-10 text-primary p-2 rounded-3 fs-4 mb-0">
+              <i class="bi {{ s.icon or 'bi-book' }}"></i>
+            </div>
+            <div>
+              <h5 class="fw-bold mb-0">{{ s.name }}</h5>
+              <span class="badge bg-secondary-subtle text-secondary small">{{ s.code or 'General' }}</span>
+            </div>
+          </div>
+          {% if s.user_id == current_user.id %}
+          <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteSubject({{ s.id }})" title="Delete Custom Subject">
+            <i class="bi bi-trash"></i>
+          </button>
+          {% else %}
+          <span class="badge bg-info bg-opacity-10 text-info small">Standard</span>
+          {% endif %}
+        </div>
+
+        <p class="text-muted small mb-3 flex-grow-1">{{ s.description or 'Course module syllabus and topics.' }}</p>
+
+        <!-- Units list -->
+        <div class="border-top pt-3 border-secondary-subtle">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small fw-bold text-muted text-uppercase">Syllabus Units ({{ s.units|length }})</span>
+            <button class="btn btn-sm btn-link text-primary p-0 text-decoration-none" onclick="openAddUnitModal({{ s.id }}, '{{ s.name }}')">
+              <i class="bi bi-plus"></i> Add Unit
+            </button>
+          </div>
+
+          <div class="accordion accordion-flush" id="accordionUnits{{ s.id }}">
+            {% for u in s.units %}
+            <div class="accordion-item bg-transparent border-0 mb-1">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-2 px-2 rounded-3 bg-secondary bg-opacity-10 text-light small" type="button" data-bs-toggle="collapse" data-bs-target="#unitCollapse{{ u.id }}">
+                  <span class="badge bg-primary me-2">Unit {{ u.unit_number }}</span>
+                  <span class="text-truncate">{{ u.title }}</span>
+                </button>
+              </h2>
+              <div id="unitCollapse{{ u.id }}" class="accordion-collapse collapse" data-bs-parent="#accordionUnits{{ s.id }}">
+                <div class="accordion-body px-2 py-2 small text-muted">
+                  {{ u.description or 'Key concepts, theory and practical topics covered in this unit.' }}
+                  <div class="mt-2">
+                    <a href="{{ url_for('main.answers_page') }}?subject_id={{ s.id }}&unit_id={{ u.id }}" class="btn btn-sm btn-outline-custom py-0 px-2" style="font-size: 0.75rem;">
+                      <i class="bi bi-magic"></i> Generate Answer for Unit
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Modal: Add Custom Subject -->
+<div class="modal fade" id="addSubjectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content study-card" style="background-color: var(--bg-card); color: var(--text-main);">
+      <div class="modal-header border-bottom border-secondary-subtle">
+        <h5 class="modal-title fw-bold"><i class="bi bi-journal-plus text-primary me-2"></i> Add New Subject</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addSubjectForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Subject Name *</label>
+            <input type="text" id="subjectName" class="form-control" placeholder="e.g. Distributed Cloud Computing" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Subject Code</label>
+            <input type="text" id="subjectCode" class="form-control" placeholder="e.g. CS-702">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description / Scope</label>
+            <textarea id="subjectDesc" class="form-control" rows="3" placeholder="Brief outline of concepts..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-top border-secondary-subtle">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary-gradient">Create Subject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Unit -->
+<div class="modal fade" id="addUnitModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content study-card" style="background-color: var(--bg-card); color: var(--text-main);">
+      <div class="modal-header border-bottom border-secondary-subtle">
+        <h5 class="modal-title fw-bold"><i class="bi bi-bookmark-plus text-secondary me-2"></i> Add Syllabus Unit</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addUnitForm">
+        <input type="hidden" id="targetSubjectId">
+        <div class="modal-body">
+          <div class="mb-2 text-muted small" id="unitModalSubjectName"></div>
+          <div class="mb-3">
+            <label class="form-label">Unit Number</label>
+            <input type="number" id="unitNumber" class="form-control" value="1" min="1">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Unit Title *</label>
+            <input type="text" id="unitTitle" class="form-control" placeholder="e.g. Distributed Consensus & Raft Protocol" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Key Topics / Description</label>
+            <textarea id="unitDesc" class="form-control" rows="3" placeholder="List core sub-topics..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer border-top border-secondary-subtle">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-secondary-gradient">Save Unit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('addSubjectForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    name: document.getElementById('subjectName').value.trim(),
+    code: document.getElementById('subjectCode').value.trim(),
+    description: document.getElementById('subjectDesc').value.trim()
+  };
+
+  try {
+    const res = await fetch('/api/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Subject created successfully!', 'success');
+      setTimeout(() => location.reload(), 600);
+    } else {
+      showToast(json.message || 'Error creating subject', 'danger');
+    }
+  } catch (err) {
+    showToast('Failed to connect to server', 'danger');
+  }
+});
+
+function openAddUnitModal(subjectId, subjectName) {
+  document.getElementById('targetSubjectId').value = subjectId;
+  document.getElementById('unitModalSubjectName').textContent = `Subject: ${subjectName}`;
+  const modal = new bootstrap.Modal(document.getElementById('addUnitModal'));
+  modal.show();
+}
+
+document.getElementById('addUnitForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const subjectId = document.getElementById('targetSubjectId').value;
+  const payload = {
+    unit_number: document.getElementById('unitNumber').value,
+    title: document.getElementById('unitTitle').value.trim(),
+    description: document.getElementById('unitDesc').value.trim()
+  };
+
+  try {
+    const res = await fetch(`/api/subjects/${subjectId}/units`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Unit added successfully!', 'success');
+      setTimeout(() => location.reload(), 600);
+    } else {
+      showToast(json.message || 'Error adding unit', 'danger');
+    }
+  } catch (err) {
+    showToast('Failed to connect to server', 'danger');
+  }
+});
+
+async function deleteSubject(subjectId) {
+  if (!confirm('Are you sure you want to delete this custom subject?')) return;
+  try {
+    const res = await fetch(`/api/subjects/${subjectId}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Subject deleted', 'info');
+      const el = document.getElementById(`subject-card-${subjectId}`);
+      if (el) el.remove();
+    } else {
+      showToast(json.message || 'Cannot delete subject', 'danger');
+    }
+  } catch (err) {
+    showToast('Error deleting subject', 'danger');
+  }
+}
+</script>
+{% endblock %}

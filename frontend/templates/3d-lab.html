@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Interactive 3D Learning Lab — AI STUDY MATE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">
+        <i class="bi bi-box-fill text-primary me-2"></i> Interactive 3D Educational Lab
+      </h3>
+      <p class="text-muted mb-0">Interact with real-time 3D models. Rotate 360&deg;, zoom in/out, pan, and examine architectural & anatomical components.</p>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- 3D Canvas Column -->
+    <div class="col-lg-8">
+      <div class="study-card p-0 overflow-hidden position-relative" style="border: 1px solid var(--border-color);">
+        <!-- 3D Canvas Viewport -->
+        <div id="threeContainer" class="three-canvas-container" style="height: 600px; background: radial-gradient(circle at center, #151b33 0%, #0c1022 100%);">
+          <!-- Loading Spinner Overlay -->
+          <div id="threeLoadingSpinner" class="position-absolute top-50 start-50 translate-middle d-flex flex-column align-items-center gap-2" style="z-index: 20;">
+            <div class="spinner-border text-primary" role="status"></div>
+            <span class="small text-muted fw-semibold">Loading 3D Geometry...</span>
+          </div>
+
+          <!-- Camera & Viewer Controls Overlay -->
+          <div class="three-controls-overlay">
+            <button id="threeRotateToggleBtn" class="icon-btn active" title="Toggle Auto-Rotation" aria-label="Auto Rotate">
+              <i class="bi bi-arrow-repeat"></i>
+            </button>
+            <button id="threeZoomInBtn" class="icon-btn" title="Zoom In" aria-label="Zoom In">
+              <i class="bi bi-zoom-in"></i>
+            </button>
+            <button id="threeZoomOutBtn" class="icon-btn" title="Zoom Out" aria-label="Zoom Out">
+              <i class="bi bi-zoom-out"></i>
+            </button>
+            <button id="threeWireframeBtn" class="icon-btn" title="Toggle Wireframe Mesh" aria-label="Wireframe">
+              <i class="bi bi-grid-3x3"></i>
+            </button>
+            <button id="threeResetBtn" class="icon-btn" title="Reset Camera View" aria-label="Reset Camera">
+              <i class="bi bi-arrows-angle-contract"></i>
+            </button>
+            <button id="threeFullscreenBtn" class="icon-btn" title="Fullscreen" aria-label="Fullscreen">
+              <i class="bi bi-fullscreen"></i>
+            </button>
+          </div>
+
+          <!-- Instruction Badge Overlay -->
+          <div class="position-absolute bottom-0 start-0 m-3 px-3 py-1 rounded-pill small" style="background: rgba(16, 20, 38, 0.75); backdrop-filter: blur(8px); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.78rem;">
+            <i class="bi bi-mouse me-1 text-primary"></i> Left Click + Drag to Rotate &bull; Scroll to Zoom &bull; Right Click to Pan
+          </div>
+        </div>
+
+        <!-- Topic Selection Strip Underneath -->
+        <div class="p-3 bg-card border-top border-secondary-subtle">
+          <div class="small fw-bold text-muted text-uppercase mb-2">Select Educational Topic:</div>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-sm btn-outline-custom active" data-3d-topic="atom">
+              <i class="bi bi-disc text-primary me-1"></i> Atom & Bohr Model
+            </button>
+            <button class="btn btn-sm btn-outline-custom" data-3d-topic="dna">
+              <i class="bi bi-activity text-success me-1"></i> DNA Helix
+            </button>
+            <button class="btn btn-sm btn-outline-custom" data-3d-topic="heart">
+              <i class="bi bi-heart-pulse text-danger me-1"></i> Human Heart
+            </button>
+            <button class="btn btn-sm btn-outline-custom" data-3d-topic="brain">
+              <i class="bi bi-cpu text-warning me-1"></i> Human Brain
+            </button>
+            <button class="btn btn-sm btn-outline-custom" data-3d-topic="solar_system">
+              <i class="bi bi-globe2 text-info me-1"></i> Solar System
+            </button>
+            <button class="btn btn-sm btn-outline-custom" data-3d-topic="cpu">
+              <i class="bi bi-motherboard text-primary me-1"></i> CPU Processor
+            </button>
+            <button class="btn btn-sm btn-outline-custom" data-3d-topic="network">
+              <i class="bi bi-hdd-network text-secondary me-1"></i> Network Topology
+            </button>
+            <button class="btn btn-sm btn-outline-custom" data-3d-topic="blockchain">
+              <i class="bi bi-link-45deg text-warning me-1"></i> Blockchain Ledger
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Educational Breakdown & Annotations Column -->
+    <div class="col-lg-4">
+      <div class="study-card h-100 d-flex flex-column">
+        <div class="mb-3">
+          <span class="badge bg-primary bg-opacity-15 text-primary small mb-2" id="modelInfoCategory">Physics & Chemistry</span>
+          <h4 class="fw-bold text-light mb-2" id="modelInfoTitle">Atomic Structure & Bohr Model</h4>
+          <p class="text-muted small mb-0" id="modelInfoDesc" style="line-height: 1.6;">
+            The Bohr model of the atom depicts a dense central nucleus composed of protons and neutrons, orbited by quantized electron shells.
+          </p>
+        </div>
+
+        <div class="border-top pt-3 border-secondary-subtle flex-grow-1 overflow-auto" style="max-height: 380px;">
+          <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-layers-half me-1"></i> Structural Components</h6>
+          <div id="modelPartsContainer"></div>
+        </div>
+
+        <div class="border-top pt-3 mt-3 border-secondary-subtle">
+          <a href="{{ url_for('main.visualizer_page') }}" class="btn btn-sm btn-outline-custom w-100 mb-2">
+            <i class="bi bi-diagram-3 me-1"></i> Open Flowchart & 2D Schematic
+          </a>
+          <a href="{{ url_for('main.answers_page') }}" class="btn btn-sm btn-secondary-gradient w-100">
+            <i class="bi bi-magic me-1"></i> Generate Exam Answer on This Topic
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Three.js CDN and OrbitControls -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<!-- Three Lab Script -->
+<script src="{{ url_for('static', filename='js/three_lab.js') }}"></script>
+{% endblock %}

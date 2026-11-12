@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Spaced Repetition Flashcards — AI STUDY MATE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">
+        <i class="bi bi-card-text text-primary me-2"></i> Spaced Repetition Flashcards
+      </h3>
+      <p class="text-muted mb-0">Review key definitions, terms, and conceptual summaries using 3D flip study flashcards.</p>
+    </div>
+    <button class="btn btn-primary-gradient" data-bs-toggle="modal" data-bs-target="#genFlashcardsModal">
+      <i class="bi bi-plus-circle-fill"></i> Generate Flashcard Deck
+    </button>
+  </div>
+
+  <div class="row g-4">
+    <!-- Active Flashcard Reviewer Column -->
+    <div class="col-lg-8">
+      <div class="study-card text-center p-4">
+        <!-- Deck Progress Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <span class="badge bg-primary bg-opacity-20 text-primary px-3 py-2 fw-bold" id="cardTopicBadge">Topic Deck</span>
+          <span class="small text-muted" id="cardCounterBadge">Card 0 of 0</span>
+          <span class="badge bg-success bg-opacity-20 text-success px-3 py-2 fw-bold" id="cardKnownRatio">0 Known</span>
+        </div>
+
+        <!-- 3D Flip Card Viewport -->
+        <div class="flashcard-scene mb-4" id="flashcardScene" onclick="toggleFlipCard()">
+          <div class="flashcard-inner" id="flashcardInner">
+            <!-- Front Face -->
+            <div class="flashcard-front">
+              <span class="badge bg-secondary-subtle text-secondary small mb-3">KEYWORD / QUESTION</span>
+              <h3 class="fw-bold text-light px-3" id="cardFrontText">No flashcards loaded</h3>
+              <span class="small text-muted mt-auto"><i class="bi bi-arrow-repeat me-1"></i> Click card to flip</span>
+            </div>
+
+            <!-- Back Face -->
+            <div class="flashcard-back">
+              <span class="badge bg-info-subtle text-info small mb-3">EXPLANATION / ANSWER</span>
+              <p class="fs-5 text-light px-3" id="cardBackText" style="line-height: 1.6;">Generate a new deck to begin revision.</p>
+              <span class="small text-white-50 mt-auto"><i class="bi bi-arrow-repeat me-1"></i> Click card to flip back</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Review Controls -->
+        <div class="d-flex justify-content-center align-items-center gap-3">
+          <button class="btn btn-outline-custom" id="prevCardBtn" onclick="prevCard()" disabled>
+            <i class="bi bi-arrow-left me-1"></i> Prev
+          </button>
+          
+          <button class="btn btn-sm btn-outline-custom px-3" onclick="toggleFlipCard()">
+            <i class="bi bi-arrow-repeat me-1"></i> Flip
+          </button>
+
+          <button class="btn btn-outline-warning" id="needReviseBtn" onclick="markCardStatus(false)" disabled>
+            <i class="bi bi-exclamation-triangle me-1"></i> Need Revision
+          </button>
+
+          <button class="btn btn-outline-success" id="markKnownBtn" onclick="markCardStatus(true)" disabled>
+            <i class="bi bi-check2-circle me-1"></i> Mastered
+          </button>
+
+          <button class="btn btn-outline-custom" id="nextCardBtn" onclick="nextCard()" disabled>
+            Next <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saved Flashcards Collection Column -->
+    <div class="col-lg-4">
+      <div class="study-card h-100 d-flex flex-column">
+        <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-collection text-secondary me-2"></i> Saved Cards (<span id="totalCardsCount">0</span>)</span>
+          <button class="btn btn-sm btn-link text-primary p-0" onclick="loadSavedCards()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </h5>
+
+        <div id="cardsListContainer" class="list-group list-group-flush bg-transparent flex-grow-1 overflow-auto" style="max-height: 520px;">
+          <div class="text-center py-4 text-muted small">Loading cards...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Generate Flashcards -->
+<div class="modal fade" id="genFlashcardsModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content study-card" style="background-color: var(--bg-card); color: var(--text-main);">
+      <div class="modal-header border-bottom border-secondary-subtle">
+        <h5 class="modal-title fw-bold"><i class="bi bi-magic text-primary me-2"></i> Generate AI Flashcards</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="genCardsForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Study Topic *</label>
+            <input type="text" id="deckTopicInput" class="form-control" placeholder="e.g. Deep Learning Backpropagation" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Subject</label>
+            <select class="form-select" id="deckSubjSelect">
+              <option value="">-- General --</option>
+              {% for s in subjects %}
+              <option value="{{ s.id }}">{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Number of Cards</label>
+            <select class="form-select" id="deckCountSelect">
+              <option value="6" selected>6 Flashcards</option>
+              <option value="10">10 Flashcards</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer border-top border-secondary-subtle">
+          <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" id="genCardsSubmitBtn" class="btn btn-primary-gradient">
+            <span id="genCardsSpinner" class="spinner-border spinner-border-sm d-none me-2"></span>
+            <span>Create Deck</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let flashcardsDeck = [];
+let currentCardIndex = 0;
+let isFlipped = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSavedCards();
+});
+
+function toggleFlipCard() {
+  const card = document.getElementById('flashcardInner');
+  isFlipped = !isFlipped;
+  card.classList.toggle('flipped', isFlipped);
+}
+
+function displayCard(index) {
+  if (flashcardsDeck.length === 0) return;
+  currentCardIndex = index;
+  const card = flashcardsDeck[index];
+
+  // Reset flip to front
+  isFlipped = false;
+  document.getElementById('flashcardInner').classList.remove('flipped');
+
+  document.getElementById('cardTopicBadge').textContent = card.topic || 'General';
+  document.getElementById('cardCounterBadge').textContent = `Card ${index + 1} of ${flashcardsDeck.length}`;
+  document.getElementById('cardFrontText').textContent = card.front;
+  document.getElementById('cardBackText').textContent = card.back;
+
+  const knownCount = flashcardsDeck.filter(c => c.is_known).length;
+  document.getElementById('cardKnownRatio').textContent = `${knownCount}/${flashcardsDeck.length} Mastered`;
+
+  document.getElementById('prevCardBtn').disabled = (index === 0);
+  document.getElementById('nextCardBtn').disabled = (index === flashcardsDeck.length - 1);
+  document.getElementById('markKnownBtn').disabled = false;
+  document.getElementById('needReviseBtn').disabled = false;
+}
+
+function nextCard() {
+  if (currentCardIndex < flashcardsDeck.length - 1) {
+    displayCard(currentCardIndex + 1);
+  }
+}
+
+function prevCard() {
+  if (currentCardIndex > 0) {
+    displayCard(currentCardIndex - 1);
+  }
+}
+
+async function markCardStatus(isKnown) {
+  if (flashcardsDeck.length === 0) return;
+  const card = flashcardsDeck[currentCardIndex];
+  card.is_known = isKnown;
+
+  try {
+    await fetch(`/api/flashcards/${card.id}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_known: isKnown })
+    });
+    showToast(isKnown ? 'Marked as Mastered!' : 'Flagged for Revision', isKnown ? 'success' : 'warning');
+    const knownCount = flashcardsDeck.filter(c => c.is_known).length;
+    document.getElementById('cardKnownRatio').textContent = `${knownCount}/${flashcardsDeck.length} Mastered`;
+  } catch (e) {
+    console.error(e);
+  }
+
+  // Auto advance
+  if (currentCardIndex < flashcardsDeck.length - 1) {
+    setTimeout(() => nextCard(), 250);
+  }
+}
+
+/* Generate Deck */
+document.getElementById('genCardsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const topic = document.getElementById('deckTopicInput').value.trim();
+  const count = document.getElementById('deckCountSelect').value;
+  const subjId = document.getElementById('deckSubjSelect').value;
+
+  const btn = document.getElementById('genCardsSubmitBtn');
+  const spinner = document.getElementById('genCardsSpinner');
+
+  btn.disabled = true;
+  spinner.classList.remove('d-none');
+
+  try {
+    const res = await fetch('/api/flashcards/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: topic,
+        count: parseInt(count),
+        subject_id: subjId || null
+      })
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast(json.message || 'Deck created!', 'success');
+      bootstrap.Modal.getInstance(document.getElementById('genFlashcardsModal')).hide();
+      loadSavedCards();
+      flashcardsDeck = json.data;
+      displayCard(0);
+    }
+  } catch (err) {
+    showToast('Failed to generate cards', 'danger');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('d-none');
+  }
+});
+
+/* Load Saved Cards */
+async function loadSavedCards() {
+  const container = document.getElementById('cardsListContainer');
+  try {
+    const res = await fetch('/api/flashcards');
+    const json = await res.json();
+    if (json.success) {
+      document.getElementById('totalCardsCount').textContent = json.data.length;
+      if (json.data.length > 0) {
+        flashcardsDeck = json.data;
+        displayCard(0);
+
+        container.innerHTML = json.data.map((c, idx) => `
+          <div class="list-group-item bg-transparent text-light border-secondary-subtle px-0 py-2 d-flex justify-content-between align-items-center">
+            <div class="text-truncate" style="max-width: 80%; cursor: pointer;" onclick="displayCard(${idx})">
+              <div class="fw-semibold text-truncate small">${escapeHtml(c.front)}</div>
+              <small class="text-muted">${escapeHtml(c.topic || 'General')} &bull; ${c.is_known ? '<span class="text-success">Mastered</span>' : '<span class="text-warning">Review</span>'}</small>
+            </div>
+            <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteFlashcard(${c.id})" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        `).join('');
+      } else {
+        container.innerHTML = '<div class="text-center py-4 text-muted small">No saved flashcards. Click "Generate Flashcard Deck" above.</div>';
+      }
+    }
+  } catch (e) {
+    container.innerHTML = '<div class="text-center py-4 text-danger small">Error loading flashcards</div>';
+  }
+}
+
+async function deleteFlashcard(id) {
+  if (!confirm('Delete this flashcard?')) return;
+  try {
+    const res = await fetch(`/api/flashcards/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Card deleted', 'info');
+      loadSavedCards();
+    }
+  } catch (e) {
+    showToast('Error deleting card', 'danger');
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — AI STUDY MATE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Welcome Banner -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h2 class="fw-bold mb-1">
+        Hello, {{ current_user.full_name or current_user.username }}! <span class="wave-emoji">👋</span>
+      </h2>
+      <p class="text-muted mb-0">Track your learning progress, generate answers, and master your subjects.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('main.upload_page') }}" class="btn btn-primary-gradient">
+        <i class="bi bi-cloud-arrow-up-fill"></i> Upload Document
+      </a>
+      <a href="{{ url_for('main.answers_page') }}" class="btn btn-secondary-gradient">
+        <i class="bi bi-magic"></i> Generate Answer
+      </a>
+    </div>
+  </div>
+
+  <!-- Key Statistics Row -->
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card">
+        <div class="stat-icon-wrapper stat-icon-primary">
+          <i class="bi bi-file-earmark-text-fill"></i>
+        </div>
+        <div>
+          <div class="stat-value">{{ total_docs }}</div>
+          <div class="stat-label">Uploaded Documents</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card">
+        <div class="stat-icon-wrapper stat-icon-secondary">
+          <i class="bi bi-chat-left-text-fill"></i>
+        </div>
+        <div>
+          <div class="stat-value">{{ total_answers }}</div>
+          <div class="stat-label">Generated Answers</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card">
+        <div class="stat-icon-wrapper stat-icon-warning">
+          <i class="bi bi-journal-bookmark-fill"></i>
+        </div>
+        <div>
+          <div class="stat-value">{{ total_notes }}</div>
+          <div class="stat-label">Saved Study Notes</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+      <div class="stat-card">
+        <div class="stat-icon-wrapper stat-icon-accent">
+          <i class="bi bi-patch-question-fill"></i>
+        </div>
+        <div>
+          <div class="stat-value">{{ avg_score }}%</div>
+          <div class="stat-label">Quiz Score ({{ total_quizzes }} tests)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions Grid -->
+  <div class="mb-4">
+    <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+      <i class="bi bi-lightning-charge-fill text-warning"></i> Quick Actions
+    </h5>
+    <div class="row g-3">
+      <div class="col-6 col-md-4 col-xl">
+        <a href="{{ url_for('main.upload_page') }}" class="quick-action-card">
+          <div class="action-icon bg-primary bg-opacity-10 text-primary">
+            <i class="bi bi-upload"></i>
+          </div>
+          <h6>Upload Material</h6>
+          <p>Extract questions & text</p>
+        </a>
+      </div>
+
+      <div class="col-6 col-md-4 col-xl">
+        <a href="{{ url_for('main.answers_page') }}" class="quick-action-card">
+          <div class="action-icon bg-secondary bg-opacity-10 text-secondary">
+            <i class="bi bi-pencil-square"></i>
+          </div>
+          <h6>Generate Answer</h6>
+          <p>2, 5, 7, 10 Marks</p>
+        </a>
+      </div>
+
+      <div class="col-6 col-md-4 col-xl">
+        <a href="{{ url_for('main.three_d_lab_page') }}" class="quick-action-card">
+          <div class="action-icon bg-info bg-opacity-10 text-info">
+            <i class="bi bi-box"></i>
+          </div>
+          <h6>3D Learning Lab</h6>
+          <p>Explore interactive models</p>
+        </a>
+      </div>
+
+      <div class="col-6 col-md-4 col-xl">
+        <a href="{{ url_for('main.quiz_page') }}" class="quick-action-card">
+          <div class="action-icon bg-warning bg-opacity-10 text-warning">
+            <i class="bi bi-check2-circle"></i>
+          </div>
+          <h6>Practice Quiz</h6>
+          <p>MCQs with rationales</p>
+        </a>
+      </div>
+
+      <div class="col-6 col-md-4 col-xl">
+        <a href="{{ url_for('main.notes_page') }}" class="quick-action-card">
+          <div class="action-icon bg-danger bg-opacity-10 text-danger">
+            <i class="bi bi-file-earmark-pdf"></i>
+          </div>
+          <h6>Study Notes & PDF</h6>
+          <p>Export revision sheets</p>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance Analytics & Recent Activity -->
+  <div class="row g-4">
+    <!-- Quiz Performance Chart -->
+    <div class="col-lg-7">
+      <div class="study-card h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0">
+            <i class="bi bi-graph-up text-primary me-2"></i> Quiz Performance Analytics
+          </h5>
+          <span class="badge bg-primary bg-opacity-10 text-primary">Last 7 attempts</span>
+        </div>
+        <div style="height: 250px; position: relative;">
+          <canvas id="quizChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Subject Navigator -->
+    <div class="col-lg-5">
+      <div class="study-card h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0">
+            <i class="bi bi-collection text-secondary me-2"></i> Active Subjects
+          </h5>
+          <a href="{{ url_for('main.subjects_page') }}" class="small text-primary fw-semibold">View All</a>
+        </div>
+        <div class="list-group list-group-flush bg-transparent">
+          {% for s in subjects[:5] %}
+          <div class="list-group-item bg-transparent text-light border-secondary-subtle px-0 py-2 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi {{ s.icon or 'bi-book' }} text-secondary fs-5"></i>
+              <div>
+                <div class="fw-semibold">{{ s.name }}</div>
+                <small class="text-muted">{{ s.code or 'Subject' }} • {{ s.units|length }} Units</small>
+              </div>
+            </div>
+            <a href="{{ url_for('main.answers_page') }}?subject_id={{ s.id }}" class="btn btn-sm btn-outline-custom py-1 px-2" title="Study this subject">
+              <i class="bi bi-arrow-right"></i>
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Activity Lists -->
+  <div class="row g-4 mt-1">
+    <!-- Recent Answers -->
+    <div class="col-lg-6">
+      <div class="study-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0">
+            <i class="bi bi-chat-left-dots text-info me-2"></i> Recent Answers
+          </h5>
+          <a href="{{ url_for('main.answers_page') }}" class="small text-primary fw-semibold">Open Answers</a>
+        </div>
+        {% if recent_answers %}
+        <div class="list-group list-group-flush bg-transparent">
+          {% for a in recent_answers %}
+          <div class="list-group-item bg-transparent text-light border-secondary-subtle px-0 py-3">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+              <div class="fw-semibold text-truncate" style="max-width: 80%;">{{ a.question_text }}</div>
+              <span class="badge badge-marks badge-marks-{{ a.marks }}">{{ a.marks }} Marks</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center small text-muted">
+              <span>{{ a.subject.name if a.subject else 'General' }} • {{ a.created_at.strftime('%b %d, %H:%M') }}</span>
+              <a href="{{ url_for('main.answers_page') }}?id={{ a.id }}" class="text-primary fw-semibold text-decoration-none">
+                View Answer <i class="bi bi-chevron-right"></i>
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+          <i class="bi bi-chat-square-text fs-2 d-block mb-2 text-secondary"></i>
+          <p class="mb-2">No answers generated yet.</p>
+          <a href="{{ url_for('main.answers_page') }}" class="btn btn-sm btn-primary-gradient">Generate First Answer</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Recent Uploads & Quizzes -->
+    <div class="col-lg-6">
+      <div class="study-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0">
+            <i class="bi bi-folder2-open text-warning me-2"></i> Recent Materials & Quizzes
+          </h5>
+          <a href="{{ url_for('main.upload_page') }}" class="small text-primary fw-semibold">View Files</a>
+        </div>
+
+        {% if recent_docs or recent_attempts %}
+        <div class="list-group list-group-flush bg-transparent">
+          {% for d in recent_docs[:3] %}
+          <div class="list-group-item bg-transparent text-light border-secondary-subtle px-0 py-2 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 70%;">
+              <i class="bi bi-file-earmark-pdf text-danger fs-5"></i>
+              <div class="text-truncate">
+                <div class="fw-semibold text-truncate">{{ d.original_filename }}</div>
+                <small class="text-muted">{{ d.file_type|upper }} • {{ d.page_count }} Pages</small>
+              </div>
+            </div>
+            <a href="{{ url_for('main.answers_page') }}?doc_id={{ d.id }}" class="btn btn-sm btn-outline-custom py-1 px-2">
+              Extract Questions
+            </a>
+          </div>
+          {% endfor %}
+
+          {% for att in recent_attempts[:2] %}
+          <div class="list-group-item bg-transparent text-light border-secondary-subtle px-0 py-2 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-patch-question-fill text-accent fs-5"></i>
+              <div>
+                <div class="fw-semibold">{{ att.quiz.title if att.quiz else 'Practice Quiz' }}</div>
+                <small class="text-muted">{{ att.score }}/{{ att.total_questions }} correct • {{ att.completed_at.strftime('%b %d') }}</small>
+              </div>
+            </div>
+            <span class="badge {% if att.percentage >= 70 %}bg-success{% elif att.percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %} px-2 py-1">
+              {{ att.percentage }}%
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+          <i class="bi bi-cloud-arrow-up fs-2 d-block mb-2 text-primary"></i>
+          <p class="mb-2">Upload a question paper or syllabus document to begin!</p>
+          <a href="{{ url_for('main.upload_page') }}" class="btn btn-sm btn-primary-gradient">Upload Now</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res = await fetch('/api/dashboard/stats');
+    const json = await res.json();
+    if (json.success && json.data.attempts_history && json.data.attempts_history.length > 0) {
+      renderChart(json.data.attempts_history);
+    } else {
+      renderEmptyChart();
+    }
+  } catch (e) {
+    renderEmptyChart();
+  }
+});
+
+function renderChart(history) {
+  const ctx = document.getElementById('quizChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: history.map(h => h.date),
+      datasets: [{
+        label: 'Quiz Score (%)',
+        data: history.map(h => h.score),
+        borderColor: '#6C63FF',
+        backgroundColor: 'rgba(108, 99, 255, 0.1)',
+        tension: 0.35,
+        fill: true,
+        pointBackgroundColor: '#00C9A7',
+        pointRadius: 5
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } },
+        x: { grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+}
+
+function renderEmptyChart() {
+  const ctx = document.getElementById('quizChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Unit 1', 'Unit 2', 'Unit 3', 'Unit 4', 'Unit 5'],
+      datasets: [{
+        label: 'Target Mastery',
+        data: [85, 90, 75, 80, 95],
+        backgroundColor: 'rgba(108, 99, 255, 0.35)',
+        borderRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } },
+        x: { grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

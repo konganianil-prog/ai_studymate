@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+
+{% block title %}AI Quiz Practice — AI STUDY MATE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">
+        <i class="bi bi-patch-question-fill text-primary me-2"></i> AI-Powered Quiz Practice
+      </h3>
+      <p class="text-muted mb-0">Generate 4-choice multiple choice quizzes from your uploaded documents or study topics.</p>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Quiz Configuration Column -->
+    <div class="col-lg-4" id="quizConfigCol">
+      <div class="study-card">
+        <h5 class="fw-bold mb-3"><i class="bi bi-gear-fill text-secondary me-2"></i> Generate Quiz</h5>
+
+        <div id="quizAlert" class="alert alert-danger d-none animate-fade-in" role="alert"></div>
+
+        <form id="createQuizForm">
+          <!-- Choose from Document -->
+          {% if documents %}
+          <div class="mb-3">
+            <label class="form-label text-muted small">Generate From Uploaded Document</label>
+            <select class="form-select" id="quizDocSelect">
+              <option value="">-- Or enter topic below --</option>
+              {% for d in documents %}
+              <option value="{{ d.id }}">{{ d.original_filename }} ({{ d.page_count }} pgs)</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <!-- Topic Input -->
+          <div class="mb-3">
+            <label class="form-label">Study Topic *</label>
+            <input type="text" id="quizTopicInput" class="form-control" placeholder="e.g. Operating Systems CPU Scheduling..." required>
+          </div>
+
+          <!-- Difficulty -->
+          <div class="mb-3">
+            <label class="form-label">Difficulty Level</label>
+            <div class="btn-group w-100" role="group">
+              <input type="radio" class="btn-check" name="quizDifficulty" id="diffEasy" value="easy">
+              <label class="btn btn-outline-custom" for="diffEasy">Easy</label>
+
+              <input type="radio" class="btn-check" name="quizDifficulty" id="diffMedium" value="medium" checked>
+              <label class="btn btn-outline-custom" for="diffMedium">Medium</label>
+
+              <input type="radio" class="btn-check" name="quizDifficulty" id="diffHard" value="hard">
+              <label class="btn btn-outline-custom" for="diffHard">Hard</label>
+            </div>
+          </div>
+
+          <!-- Number of questions -->
+          <div class="mb-3">
+            <label class="form-label">Number of Questions</label>
+            <select class="form-select" id="quizCountSelect">
+              <option value="5" selected>5 Questions (Standard)</option>
+              <option value="10">10 Questions (Comprehensive)</option>
+            </select>
+          </div>
+
+          <!-- Mode -->
+          <div class="mb-4">
+            <label class="form-label">Practice Mode</label>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="practiceModeToggle">
+              <label class="form-check-label small text-light" for="practiceModeToggle">Instant Answer Feedback (Practice Mode)</label>
+            </div>
+          </div>
+
+          <button type="submit" id="generateQuizBtn" class="btn btn-primary-gradient w-100 py-2 fs-6">
+            <span id="quizSpinner" class="spinner-border spinner-border-sm d-none me-2"></span>
+            <i class="bi bi-patch-check"></i>
+            <span>Start AI Quiz</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Past Quizzes Card -->
+      <div class="study-card mt-4">
+        <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-clock-history text-warning me-2"></i> Saved Quizzes</span>
+          <button class="btn btn-sm btn-link text-primary p-0" onclick="loadSavedQuizzes()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </h5>
+        <div id="savedQuizzesList" class="list-group list-group-flush bg-transparent" style="max-height: 350px; overflow-y: auto;">
+          <div class="text-center py-3 text-muted small">Loading saved quizzes...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Quiz Playing & Results Column -->
+    <div class="col-lg-8" id="quizPlayCol">
+      <div class="study-card h-100 d-flex flex-column">
+        <!-- Initial Empty State -->
+        <div id="emptyQuizPrompt" class="text-center py-5 my-auto text-muted">
+          <i class="bi bi-card-checklist fs-1 d-block mb-3 text-primary"></i>
+          <h5>No active quiz</h5>
+          <p class="small text-muted">Configure quiz parameters on the left to start testing your knowledge.</p>
+        </div>
+
+        <!-- Active Quiz Header (Hidden initially) -->
+        <div id="activeQuizHeader" class="d-none d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-secondary-subtle">
+          <div>
+            <h5 class="fw-bold text-light mb-0" id="quizDisplayTitle">Operating Systems Quiz</h5>
+            <span class="small text-muted" id="quizDisplayMeta">5 Questions &bull; Medium Difficulty</span>
+          </div>
+          <span class="badge bg-primary bg-opacity-20 text-primary px-3 py-2 fw-bold" id="quizTimerBadge">Practice</span>
+        </div>
+
+        <!-- Quiz Questions List Container -->
+        <form id="quizAnswersForm" class="d-none flex-grow-1 overflow-auto" style="max-height: 600px;">
+          <div id="questionsContainer" class="d-flex flex-column gap-4"></div>
+          <div class="mt-4 pt-3 border-top border-secondary-subtle d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-custom" onclick="cancelActiveQuiz()">Abandon Quiz</button>
+            <button type="submit" id="submitQuizBtn" class="btn btn-primary-gradient px-4">
+              <span>Submit & Check Score</span>
+              <i class="bi bi-check2-circle ms-1"></i>
+            </button>
+          </div>
+        </form>
+
+        <!-- Quiz Results & Review Screen (Hidden initially) -->
+        <div id="quizResultsScreen" class="d-none flex-grow-1 overflow-auto">
+          <div class="text-center p-4 rounded-3 mb-4" id="scoreBanner" style="background: linear-gradient(135deg, rgba(108, 99, 255, 0.15), rgba(0, 201, 167, 0.15)); border: 1px solid var(--border-color);">
+            <div class="display-3 fw-bold mb-1" id="scoreDisplay">4/5</div>
+            <div class="fs-5 fw-bold text-light" id="scorePercentageDisplay">80% Mastery</div>
+            <p class="small text-muted mb-3" id="scoreFeedbackText">Great performance! You have a solid grasp of this concept.</p>
+            <button class="btn btn-sm btn-primary-gradient" onclick="resetToNewQuiz()">
+              <i class="bi bi-arrow-repeat me-1"></i> Take Another Quiz
+            </button>
+          </div>
+
+          <h5 class="fw-bold mb-3 text-light"><i class="bi bi-card-text text-secondary me-2"></i> Detailed Question Rationales</h5>
+          <div id="resultsBreakdownContainer" class="d-flex flex-column gap-3"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentActiveQuiz = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSavedQuizzes();
+  initDocSelector();
+});
+
+function initDocSelector() {
+  const docSelect = document.getElementById('quizDocSelect');
+  if (!docSelect) return;
+  docSelect.addEventListener('change', () => {
+    if (docSelect.value) {
+      const selected = docSelect.options[docSelect.selectedIndex].text;
+      document.getElementById('quizTopicInput').value = selected.split('(')[0].trim();
+    }
+  });
+}
+
+/* Submit Quiz Config */
+document.getElementById('createQuizForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const topic = document.getElementById('quizTopicInput').value.trim();
+  const docId = document.getElementById('quizDocSelect') ? document.getElementById('quizDocSelect').value : null;
+
+  const btn = document.getElementById('generateQuizBtn');
+  const spinner = document.getElementById('quizSpinner');
+  const alertBox = document.getElementById('quizAlert');
+
+  btn.disabled = true;
+  spinner.classList.remove('d-none');
+  alertBox.classList.add('d-none');
+
+  const difficulty = document.querySelector('input[name="quizDifficulty"]:checked').value;
+  const count = document.getElementById('quizCountSelect').value;
+
+  try {
+    const res = await fetch('/api/quizzes/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: topic,
+        document_id: docId || null,
+        difficulty: difficulty,
+        count: parseInt(count)
+      })
+    });
+    const json = await res.json();
+
+    if (json.success) {
+      loadSavedQuizzes();
+      startQuizSession(json.data);
+    } else {
+      alertBox.textContent = json.message || 'Failed to generate quiz';
+      alertBox.classList.remove('d-none');
+    }
+  } catch (err) {
+    alertBox.textContent = 'Server connection error';
+    alertBox.classList.remove('d-none');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('d-none');
+  }
+});
+
+/* Render and Start Quiz */
+function startQuizSession(quiz) {
+  currentActiveQuiz = quiz;
+
+  document.getElementById('emptyQuizPrompt').classList.add('d-none');
+  document.getElementById('quizResultsScreen').classList.add('d-none');
+  document.getElementById('activeQuizHeader').classList.remove('d-none');
+  document.getElementById('quizAnswersForm').classList.remove('d-none');
+
+  document.getElementById('quizDisplayTitle').textContent = quiz.title;
+  document.getElementById('quizDisplayMeta').textContent = `${quiz.questions.length} Questions • ${quiz.difficulty.toUpperCase()}`;
+
+  const container = document.getElementById('questionsContainer');
+  const isPractice = document.getElementById('practiceModeToggle').checked;
+
+  container.innerHTML = quiz.questions.map((q, idx) => `
+    <div class="p-3 rounded-3 study-card" style="background-color: var(--bg-input); border: 1px solid var(--border-color);" id="q-card-${q.id}">
+      <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+        <span class="badge bg-primary bg-opacity-20 text-primary fw-bold">Question ${idx + 1}</span>
+      </div>
+      <h6 class="fw-semibold text-light mb-3" style="line-height: 1.5;">${escapeHtml(q.question_text)}</h6>
+
+      <div class="d-flex flex-column gap-2 mb-2">
+        <label class="p-2 px-3 rounded-2 d-flex align-items-center gap-3 cursor-pointer option-label" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color);">
+          <input type="radio" name="answer_${q.id}" value="A" class="form-check-input mt-0" ${isPractice ? `onchange="handlePracticeOption(${q.id}, 'A', '${q.correct_option}')"` : ''}>
+          <span class="small text-light"><strong>A.</strong> ${escapeHtml(q.option_a)}</span>
+        </label>
+        <label class="p-2 px-3 rounded-2 d-flex align-items-center gap-3 cursor-pointer option-label" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color);">
+          <input type="radio" name="answer_${q.id}" value="B" class="form-check-input mt-0" ${isPractice ? `onchange="handlePracticeOption(${q.id}, 'B', '${q.correct_option}')"` : ''}>
+          <span class="small text-light"><strong>B.</strong> ${escapeHtml(q.option_b)}</span>
+        </label>
+        <label class="p-2 px-3 rounded-2 d-flex align-items-center gap-3 cursor-pointer option-label" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color);">
+          <input type="radio" name="answer_${q.id}" value="C" class="form-check-input mt-0" ${isPractice ? `onchange="handlePracticeOption(${q.id}, 'C', '${q.correct_option}')"` : ''}>
+          <span class="small text-light"><strong>C.</strong> ${escapeHtml(q.option_c)}</span>
+        </label>
+        <label class="p-2 px-3 rounded-2 d-flex align-items-center gap-3 cursor-pointer option-label" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color);">
+          <input type="radio" name="answer_${q.id}" value="D" class="form-check-input mt-0" ${isPractice ? `onchange="handlePracticeOption(${q.id}, 'D', '${q.correct_option}')"` : ''}>
+          <span class="small text-light"><strong>D.</strong> ${escapeHtml(q.option_d)}</span>
+        </label>
+      </div>
+
+      <div id="practice-feedback-${q.id}" class="d-none mt-2 small p-2 rounded-2"></div>
+    </div>
+  `).join('');
+}
+
+function handlePracticeOption(qId, selected, correct) {
+  const box = document.getElementById(`practice-feedback-${qId}`);
+  if (!box) return;
+  box.classList.remove('d-none');
+  if (selected === correct) {
+    box.className = 'mt-2 small p-2 rounded-2 bg-success bg-opacity-20 text-success';
+    box.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i> Correct! Option ${correct} is the right answer.`;
+  } else {
+    box.className = 'mt-2 small p-2 rounded-2 bg-danger bg-opacity-20 text-danger';
+    box.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i> Incorrect. The correct answer is Option ${correct}.`;
+  }
+}
+
+/* Submit Quiz Answers */
+document.getElementById('quizAnswersForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!currentActiveQuiz) return;
+
+  const answers = {};
+  currentActiveQuiz.questions.forEach(q => {
+    const selected = document.querySelector(`input[name="answer_${q.id}"]:checked`);
+    if (selected) {
+      answers[q.id] = selected.value;
+    }
+  });
+
+  try {
+    const res = await fetch(`/api/quizzes/${currentActiveQuiz.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers: answers })
+    });
+    const json = await res.json();
+    if (json.success) {
+      renderQuizResults(json.data);
+    }
+  } catch (err) {
+    showToast('Error submitting quiz answers', 'danger');
+  }
+});
+
+/* Render Results Screen */
+function renderQuizResults(data) {
+  document.getElementById('quizAnswersForm').classList.add('d-none');
+  document.getElementById('activeQuizHeader').classList.add('d-none');
+  document.getElementById('quizResultsScreen').classList.remove('d-none');
+
+  document.getElementById('scoreDisplay').textContent = `${data.score}/${data.total}`;
+  document.getElementById('scorePercentageDisplay').textContent = `${data.percentage}% Score`;
+
+  const feedbackText = document.getElementById('scoreFeedbackText');
+  if (data.percentage >= 80) {
+    feedbackText.textContent = 'Outstanding! You have mastered these examination concepts.';
+  } else if (data.percentage >= 60) {
+    feedbackText.textContent = 'Good effort! Review the explanations below to refine weak areas.';
+  } else {
+    feedbackText.textContent = 'Keep practicing. Re-read study notes and review the rationales below.';
+  }
+
+  const container = document.getElementById('resultsBreakdownContainer');
+  container.innerHTML = data.results.map((r, idx) => `
+    <div class="p-3 rounded-3" style="background-color: var(--bg-input); border-left: 4px solid ${r.is_correct ? 'var(--secondary)' : 'var(--danger)'};">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="small fw-bold text-muted">Question ${idx + 1}</span>
+        <span class="badge ${r.is_correct ? 'bg-success' : 'bg-danger'}">${r.is_correct ? 'Correct' : 'Incorrect'}</span>
+      </div>
+      <p class="mb-2 text-light fw-semibold small">${escapeHtml(r.question_text)}</p>
+      <div class="small mb-2 text-light">
+        <span>Your Answer: <strong>Option ${r.selected_option || 'None'}</strong></span> &bull; 
+        <span class="text-success ms-2">Correct Answer: <strong>Option ${r.correct_option}</strong></span>
+      </div>
+      <div class="p-2 rounded-2 small text-muted" style="background: rgba(255,255,255,0.03);">
+        <strong>Rationale:</strong> ${escapeHtml(r.explanation || 'No rationale provided.')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function resetToNewQuiz() {
+  document.getElementById('quizResultsScreen').classList.add('d-none');
+  document.getElementById('emptyQuizPrompt').classList.remove('d-none');
+  currentActiveQuiz = null;
+}
+
+function cancelActiveQuiz() {
+  if (confirm('Abandon this active quiz session?')) {
+    resetToNewQuiz();
+  }
+}
+
+/* Load Saved Quizzes */
+async function loadSavedQuizzes() {
+  const container = document.getElementById('savedQuizzesList');
+  try {
+    const res = await fetch('/api/quizzes');
+    const json = await res.json();
+    if (json.success && json.data.length > 0) {
+      container.innerHTML = json.data.map(q => `
+        <div class="list-group-item bg-transparent text-light border-secondary-subtle px-0 py-2 d-flex justify-content-between align-items-center">
+          <div class="text-truncate" style="max-width: 75%; cursor: pointer;" onclick="loadExistingQuiz(${q.id})">
+            <div class="fw-semibold text-truncate small">${escapeHtml(q.title)}</div>
+            <small class="text-muted">${q.question_count} Qs • ${q.difficulty.toUpperCase()} • ${q.created_at}</small>
+          </div>
+          <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteQuiz(${q.id})" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      `).join('');
+    } else {
+      container.innerHTML = '<div class="text-center py-3 text-muted small">No saved quizzes yet.</div>';
+    }
+  } catch (e) {
+    container.innerHTML = '<div class="text-center py-3 text-danger small">Error loading quizzes</div>';
+  }
+}
+
+async function loadExistingQuiz(id) {
+  try {
+    const res = await fetch(`/api/quizzes/${id}?practice=false`);
+    const json = await res.json();
+    if (json.success) {
+      startQuizSession(json.data);
+    }
+  } catch (e) {
+    showToast('Failed to load quiz', 'danger');
+  }
+}
+
+async function deleteQuiz(id) {
+  if (!confirm('Delete this quiz?')) return;
+  try {
+    const res = await fetch(`/api/quizzes/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Quiz deleted', 'info');
+      loadSavedQuizzes();
+    }
+  } catch (e) {
+    showToast('Error deleting quiz', 'danger');
+  }
+}
+</script>
+{% endblock %}

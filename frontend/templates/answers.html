@@ -1,0 +1,556 @@
+{% extends "base.html" %}
+
+{% block title %}AI Answer Lab — AI STUDY MATE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">
+        <i class="bi bi-cpu-fill text-primary me-2"></i> AI Academic Answer Lab
+      </h3>
+      <p class="text-muted mb-0">Generate structured exam answers tailored to 2, 5, 7, and 10 marks criteria in English & Telugu.</p>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Generator Controls -->
+    <div class="col-lg-5">
+      <div class="study-card">
+        <h5 class="fw-bold mb-3"><i class="bi bi-sliders text-secondary me-2"></i> Answer Parameters</h5>
+
+        <div id="genAlert" class="alert alert-danger d-none animate-fade-in" role="alert"></div>
+
+        <form id="generateAnswerForm">
+          <!-- Choose from Extracted Questions -->
+          {% if documents %}
+          <div class="mb-3">
+            <label class="form-label text-muted small">Load Question from Uploaded Documents</label>
+            <select class="form-select" id="selectDocQuestion">
+              <option value="">-- Choose Extracted Question (Optional) --</option>
+              {% for d in documents %}
+                {% if d.extracted_questions %}
+                  <optgroup label="{{ d.original_filename }}">
+                    {% for q in d.extracted_questions %}
+                    <option value="{{ q.id }}" data-marks="{{ q.suggested_marks }}" data-text="{{ q.question_text }}" data-docid="{{ d.id }}" data-subjid="{{ d.subject_id or '' }}" data-unitid="{{ d.unit_id or '' }}">
+                      Q{{ q.question_number or loop.index }}: {{ q.question_text[:65] }}... ({{ q.suggested_marks }}M)
+                    </option>
+                    {% endfor %}
+                  </optgroup>
+                {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <!-- Question Input -->
+          <div class="mb-3">
+            <label for="questionInput" class="form-label">Question Text *</label>
+            <textarea class="form-control" id="questionInput" rows="3" placeholder="Enter your academic question here (e.g. Explain the architecture of Deep Convolutional Neural Networks)..." required></textarea>
+          </div>
+
+          <!-- Subject & Unit -->
+          <div class="row g-2 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label">Subject</label>
+              <select class="form-select" id="ansSubjectSelect">
+                <option value="">-- General --</option>
+                {% for s in subjects %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Unit / Module</label>
+              <select class="form-select" id="ansUnitSelect" disabled>
+                <option value="">-- Select Subject First --</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Marks Selector (2, 5, 7, 10 Marks) -->
+          <div class="mb-3">
+            <label class="form-label">Target Exam Marks</label>
+            <div class="btn-group w-100" role="group" id="marksButtonGroup">
+              <input type="radio" class="btn-check" name="marksRadio" id="marks2" value="2">
+              <label class="btn btn-outline-custom" for="marks2">2 Marks</label>
+
+              <input type="radio" class="btn-check" name="marksRadio" id="marks5" value="5" checked>
+              <label class="btn btn-outline-custom" for="marks5">5 Marks</label>
+
+              <input type="radio" class="btn-check" name="marksRadio" id="marks7" value="7">
+              <label class="btn btn-outline-custom" for="marks7">7 Marks</label>
+
+              <input type="radio" class="btn-check" name="marksRadio" id="marks10" value="10">
+              <label class="btn btn-outline-custom" for="marks10">10 Marks</label>
+            </div>
+            <div class="form-text small text-muted mt-1" id="marksDescription">
+              5 Marks: Introduction, Core Explanation, Important Points, Example, Conclusion.
+            </div>
+          </div>
+
+          <!-- Language Selector -->
+          <div class="mb-4">
+            <label class="form-label">Explanation Language</label>
+            <select class="form-select" id="languageSelect">
+              <option value="en">🇬🇧 English (Standard Academic)</option>
+              <option value="te">🇮🇳 Telugu (తెలుగు వివరణ)</option>
+              <option value="en_te" selected>🌐 English + Telugu (Dual Academic & Telugu)</option>
+            </select>
+          </div>
+
+          <!-- Generate Button -->
+          <button type="submit" id="generateBtn" class="btn btn-primary-gradient w-100 py-2 fs-6">
+            <span id="genSpinner" class="spinner-border spinner-border-sm d-none me-2"></span>
+            <i class="bi bi-stars"></i>
+            <span>Generate Structured Answer</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- History of Generated Answers -->
+      <div class="study-card mt-4">
+        <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-clock-history text-warning me-2"></i> Previously Generated</span>
+          <button class="btn btn-sm btn-link text-primary p-0" onclick="loadAnswerHistory()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </h5>
+        <div id="answerHistoryContainer" class="list-group list-group-flush bg-transparent" style="max-height: 380px; overflow-y: auto;">
+          <div class="text-center py-3 text-muted small">Loading history...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Answer Display & Editor Pane -->
+    <div class="col-lg-7">
+      <div class="study-card h-100 d-flex flex-column">
+        <!-- Display Header Controls -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-3 border-bottom border-secondary-subtle">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge badge-marks badge-marks-5" id="displayMarksBadge">5 Marks</span>
+            <span class="badge bg-secondary-subtle text-secondary small" id="displayLangBadge">English + Telugu</span>
+            <span class="badge bg-primary-subtle text-primary small d-none" id="displayAiBadge"><i class="bi bi-stars me-1"></i> Live Gemini AI</span>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-custom" id="editToggleBtn" onclick="toggleEditMode()" disabled>
+              <i class="bi bi-pencil me-1"></i> Edit
+            </button>
+            <button class="btn btn-sm btn-outline-custom" id="saveNoteBtn" onclick="saveAsStudyNote()" disabled>
+              <i class="bi bi-journal-plus me-1"></i> Save Note
+            </button>
+            <button class="btn btn-sm btn-secondary-gradient" id="regenerateBtn" onclick="triggerRegenerate()" disabled>
+              <i class="bi bi-arrow-repeat me-1"></i> Regenerate
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty State Prompt -->
+        <div id="emptyAnswerPrompt" class="text-center py-5 my-auto text-muted">
+          <i class="bi bi-card-checklist fs-1 d-block mb-3 text-primary"></i>
+          <h5>No answer generated yet</h5>
+          <p class="small text-muted">Enter a question or pick one extracted from your uploaded question papers on the left.</p>
+        </div>
+
+        <!-- Rendered Answer Content -->
+        <div id="answerDisplayArea" class="d-none flex-grow-1 overflow-auto" style="max-height: 720px;">
+          <!-- Question Title -->
+          <h4 class="fw-bold text-light mb-3" id="displayQuestionTitle"></h4>
+
+          <!-- Diagram Suggestion Callout if present -->
+          <div id="diagramSuggestionBox" class="p-3 mb-3 rounded-3 d-none" style="background: rgba(108, 99, 255, 0.08); border-left: 4px solid var(--primary);">
+            <div class="fw-semibold text-primary mb-1"><i class="bi bi-diagram-3 me-1"></i> Exam Diagram Recommendation</div>
+            <div class="small text-light" id="diagramSuggestionText"></div>
+          </div>
+
+          <!-- Reader View -->
+          <div id="answerReaderContent" class="content-viewer text-light"></div>
+
+          <!-- Editor View (Hidden by default) -->
+          <div id="answerEditorContainer" class="d-none mt-2">
+            <label class="form-label small text-muted">Edit Answer Markdown</label>
+            <textarea id="answerEditTextArea" class="form-control font-monospace" rows="18"></textarea>
+            <div class="d-flex justify-content-end gap-2 mt-2">
+              <button class="btn btn-sm btn-outline-custom" onclick="cancelEdit()">Cancel</button>
+              <button class="btn btn-sm btn-primary-gradient" onclick="saveEditedAnswer()">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentAnswer = null;
+let currentQuestionParams = null;
+let isEditing = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  initUrlParams();
+  initCascade();
+  initMarksDescription();
+  initDocQuestionSelector();
+  loadAnswerHistory();
+});
+
+/* Read URL parameters (e.g. from Upload page or Dashboard) */
+function initUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get('question');
+  const marks = params.get('marks');
+  const ansId = params.get('id');
+
+  if (q) {
+    document.getElementById('questionInput').value = decodeURIComponent(q);
+  }
+  if (marks && ['2', '5', '7', '10'].includes(marks)) {
+    const radio = document.getElementById(`marks${marks}`);
+    if (radio) {
+      radio.checked = true;
+      updateMarksDesc(marks);
+    }
+  }
+  if (ansId) {
+    loadSingleAnswer(ansId);
+  }
+}
+
+/* Marks descriptions */
+function initMarksDescription() {
+  const radios = document.querySelectorAll('input[name="marksRadio"]');
+  radios.forEach(r => {
+    r.addEventListener('change', (e) => {
+      updateMarksDesc(e.target.value);
+    });
+  });
+}
+
+function updateMarksDesc(marks) {
+  const desc = document.getElementById('marksDescription');
+  const map = {
+    '2': '2 Marks: Definition, Two important points, Short example.',
+    '5': '5 Marks: Introduction, Core Explanation, Important Points, Example, Conclusion.',
+    '7': '7 Marks: Introduction, Detailed Explanation, Working/Process, Diagram Suggestion, Advantages, Conclusion.',
+    '10': '10 Marks: Introduction, Full Architecture, Step-by-Step Workflow, Flowchart/Diagram, Advantages, Disadvantages, Real-World Applications, Conclusion.'
+  };
+  desc.textContent = map[marks] || '';
+}
+
+/* Subject -> Unit cascade */
+function initCascade() {
+  const subjSelect = document.getElementById('ansSubjectSelect');
+  const unitSelect = document.getElementById('ansUnitSelect');
+
+  subjSelect.addEventListener('change', async () => {
+    const subjId = subjSelect.value;
+    unitSelect.innerHTML = '<option value="">-- All Units --</option>';
+    if (!subjId) {
+      unitSelect.disabled = true;
+      return;
+    }
+    try {
+      const res = await fetch(`/api/subjects/${subjId}/units`);
+      const json = await res.json();
+      if (json.success && json.data.length > 0) {
+        json.data.forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.id;
+          opt.textContent = `Unit ${u.unit_number}: ${u.title}`;
+          unitSelect.appendChild(opt);
+        });
+        unitSelect.disabled = false;
+      } else {
+        unitSelect.disabled = true;
+      }
+    } catch (e) {
+      unitSelect.disabled = true;
+    }
+  });
+}
+
+/* Handle question pick from extracted documents */
+function initDocQuestionSelector() {
+  const select = document.getElementById('selectDocQuestion');
+  if (!select) return;
+
+  select.addEventListener('change', () => {
+    const selected = select.options[select.selectedIndex];
+    if (!selected.value) return;
+
+    const text = selected.getAttribute('data-text');
+    const marks = selected.getAttribute('data-marks');
+    const subjid = selected.getAttribute('data-subjid');
+    const unitid = selected.getAttribute('data-unitid');
+
+    if (text) document.getElementById('questionInput').value = text;
+    if (marks && document.getElementById(`marks${marks}`)) {
+      document.getElementById(`marks${marks}`).checked = true;
+      updateMarksDesc(marks);
+    }
+    if (subjid) {
+      document.getElementById('ansSubjectSelect').value = subjid;
+      document.getElementById('ansSubjectSelect').dispatchEvent(new Event('change'));
+    }
+  });
+}
+
+/* Form submission: Generate Answer */
+document.getElementById('generateAnswerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const question = document.getElementById('questionInput').value.trim();
+  if (!question) return;
+
+  const btn = document.getElementById('generateBtn');
+  const spinner = document.getElementById('genSpinner');
+  const alertBox = document.getElementById('genAlert');
+
+  btn.disabled = true;
+  spinner.classList.remove('d-none');
+  alertBox.classList.add('d-none');
+
+  const marks = document.querySelector('input[name="marksRadio"]:checked').value;
+  const lang = document.getElementById('languageSelect').value;
+  const subjId = document.getElementById('ansSubjectSelect').value;
+  const unitId = document.getElementById('ansUnitSelect').value;
+
+  currentQuestionParams = {
+    question_text: question,
+    marks: parseInt(marks),
+    language_mode: lang,
+    subject_id: subjId || null,
+    unit_id: unitId || null
+  };
+
+  try {
+    const res = await fetch('/api/answers/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentQuestionParams)
+    });
+    const json = await res.json();
+
+    if (json.success) {
+      renderAnswer(json.data);
+      loadAnswerHistory();
+      showToast('Answer generated successfully!', 'success');
+    } else {
+      alertBox.textContent = json.message || 'Generation failed';
+      alertBox.classList.remove('d-none');
+    }
+  } catch (err) {
+    alertBox.textContent = 'Server error during generation';
+    alertBox.classList.remove('d-none');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('d-none');
+  }
+});
+
+/* Render Answer Details */
+function renderAnswer(data) {
+  currentAnswer = data;
+
+  document.getElementById('emptyAnswerPrompt').classList.add('d-none');
+  document.getElementById('answerDisplayArea').classList.remove('d-none');
+
+  document.getElementById('displayQuestionTitle').textContent = data.question_text;
+  
+  // Marks badge
+  const marksBadge = document.getElementById('displayMarksBadge');
+  marksBadge.textContent = `${data.marks} Marks`;
+  marksBadge.className = `badge badge-marks badge-marks-${data.marks}`;
+
+  // Lang badge
+  const langMap = { 'en': 'English', 'te': 'Telugu', 'en_te': 'English + Telugu' };
+  document.getElementById('displayLangBadge').textContent = langMap[data.language_mode] || 'English';
+
+  // Live AI badge
+  const aiBadge = document.getElementById('displayAiBadge');
+  if (data.is_ai_live) {
+    aiBadge.classList.remove('d-none');
+  } else {
+    aiBadge.classList.add('d-none');
+  }
+
+  // Diagram suggestion
+  const diagBox = document.getElementById('diagramSuggestionBox');
+  const diagText = document.getElementById('diagramSuggestionText');
+  if (data.diagram_suggestion) {
+    diagText.textContent = data.diagram_suggestion;
+    diagBox.classList.remove('d-none');
+  } else {
+    diagBox.classList.add('d-none');
+  }
+
+  // Format markdown to HTML
+  document.getElementById('answerReaderContent').innerHTML = formatMarkdown(data.raw_answer);
+  document.getElementById('answerEditTextArea').value = data.raw_answer;
+
+  // Enable action buttons
+  document.getElementById('editToggleBtn').disabled = false;
+  document.getElementById('saveNoteBtn').disabled = false;
+  document.getElementById('regenerateBtn').disabled = false;
+}
+
+/* Simple markdown to HTML formatter */
+function formatMarkdown(text) {
+  if (!text) return '';
+  let html = escapeHtml(text);
+
+  // Headers
+  html = html.replace(/^### (.*$)/gim, '<h4 class="mt-4 mb-2 text-primary">$1</h4>');
+  html = html.replace(/^## (.*$)/gim, '<h3 class="mt-4 mb-2 text-secondary">$1</h3>');
+
+  // Bold & Italic
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  // Code blocks
+  html = html.replace(/```([\s\S]*?)```/g, '<pre class="p-3 rounded-3 bg-black bg-opacity-40 text-info font-monospace my-2"><code>$1</code></pre>');
+  html = html.replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-black bg-opacity-30 text-warning font-monospace">$1</code>');
+
+  // Blockquotes / notices
+  html = html.replace(/^> (.*$)/gim, '<blockquote class="border-start border-3 border-secondary ps-3 py-1 my-2 text-muted fst-italic">$1</blockquote>');
+
+  // Bullet points
+  html = html.replace(/^\- (.*$)/gim, '<li class="ms-3 mb-1">$1</li>');
+
+  // Paragraphs
+  html = html.replace(/\n\n/g, '<div class="my-2"></div>');
+
+  return html;
+}
+
+/* Edit Mode Toggle */
+function toggleEditMode() {
+  const reader = document.getElementById('answerReaderContent');
+  const editor = document.getElementById('answerEditorContainer');
+  const btn = document.getElementById('editToggleBtn');
+
+  isEditing = !isEditing;
+  if (isEditing) {
+    reader.classList.add('d-none');
+    editor.classList.remove('d-none');
+    btn.innerHTML = '<i class="bi bi-eye me-1"></i> Preview';
+  } else {
+    cancelEdit();
+  }
+}
+
+function cancelEdit() {
+  isEditing = false;
+  document.getElementById('answerReaderContent').classList.remove('d-none');
+  document.getElementById('answerEditorContainer').classList.add('d-none');
+  document.getElementById('editToggleBtn').innerHTML = '<i class="bi bi-pencil me-1"></i> Edit';
+}
+
+async function saveEditedAnswer() {
+  if (!currentAnswer) return;
+  const newContent = document.getElementById('answerEditTextArea').value;
+
+  try {
+    const res = await fetch(`/api/answers/${currentAnswer.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw_answer: newContent })
+    });
+    const json = await res.json();
+    if (json.success) {
+      currentAnswer.raw_answer = newContent;
+      document.getElementById('answerReaderContent').innerHTML = formatMarkdown(newContent);
+      cancelEdit();
+      showToast('Answer updated successfully', 'success');
+    }
+  } catch (err) {
+    showToast('Failed to save edits', 'danger');
+  }
+}
+
+/* Save directly as Study Note */
+async function saveAsStudyNote() {
+  if (!currentAnswer) return;
+  try {
+    const res = await fetch(`/api/answers/${currentAnswer.id}/save-note`, { method: 'POST' });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Saved to Study Notes!', 'success');
+    } else {
+      showToast(json.message || 'Failed to save note', 'danger');
+    }
+  } catch (err) {
+    showToast('Error saving note', 'danger');
+  }
+}
+
+/* Regenerate Answer */
+function triggerRegenerate() {
+  if (!currentQuestionParams) return;
+  document.getElementById('generateAnswerForm').dispatchEvent(new Event('submit'));
+}
+
+/* Load Answer History */
+async function loadAnswerHistory() {
+  const container = document.getElementById('answerHistoryContainer');
+  try {
+    const res = await fetch('/api/answers');
+    const json = await res.json();
+    if (json.success && json.data.length > 0) {
+      container.innerHTML = json.data.map(a => `
+        <div class="list-group-item bg-transparent text-light border-secondary-subtle px-0 py-2 d-flex justify-content-between align-items-center">
+          <div class="text-truncate" style="max-width: 75%; cursor: pointer;" onclick="loadSingleAnswer(${a.id})">
+            <div class="fw-semibold text-truncate small">${escapeHtml(a.question_text)}</div>
+            <div class="d-flex align-items-center gap-2 mt-1">
+              <span class="badge badge-marks badge-marks-${a.marks}">${a.marks}M</span>
+              <span class="small text-muted">${a.created_at}</span>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteAnswer(${a.id})" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      `).join('');
+    } else {
+      container.innerHTML = '<div class="text-center py-3 text-muted small">No generated answers yet.</div>';
+    }
+  } catch (e) {
+    container.innerHTML = '<div class="text-center py-3 text-danger small">Error loading history</div>';
+  }
+}
+
+async function loadSingleAnswer(id) {
+  try {
+    const res = await fetch(`/api/answers/${id}`);
+    const json = await res.json();
+    if (json.success) {
+      renderAnswer(json.data);
+    }
+  } catch (e) {
+    showToast('Error loading answer', 'danger');
+  }
+}
+
+async function deleteAnswer(id) {
+  if (!confirm('Delete this saved answer?')) return;
+  try {
+    const res = await fetch(`/api/answers/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Answer deleted', 'info');
+      loadAnswerHistory();
+      if (currentAnswer && currentAnswer.id === id) {
+        document.getElementById('emptyAnswerPrompt').classList.remove('d-none');
+        document.getElementById('answerDisplayArea').classList.add('d-none');
+        currentAnswer = null;
+      }
+    }
+  } catch (e) {
+    showToast('Error deleting answer', 'danger');
+  }
+}
+</script>
+{% endblock %}

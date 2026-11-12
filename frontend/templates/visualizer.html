@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block title %}Visual Explainer & Flowcharts — AI STUDY MATE{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">
+        <i class="bi bi-diagram-3-fill text-primary me-2"></i> Visual Learning & Flowchart Lab
+      </h3>
+      <p class="text-muted mb-0">Generate conceptual mind maps, architectural flowcharts, and technical diagrams for any academic topic.</p>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Controls Column -->
+    <div class="col-lg-4">
+      <div class="study-card">
+        <h5 class="fw-bold mb-3"><i class="bi bi-lightbulb text-warning me-2"></i> Topic Explorer</h5>
+
+        <div id="visAlert" class="alert alert-danger d-none animate-fade-in" role="alert"></div>
+
+        <form id="visualizerForm">
+          <div class="mb-3">
+            <label class="form-label">Study Topic *</label>
+            <input type="text" id="topicInput" class="form-control" placeholder="e.g. Blockchain, Convolutional Neural Networks, Deadlock..." required autofocus>
+          </div>
+
+          <!-- Suggested Topic Quick-Pills -->
+          <div class="mb-3">
+            <label class="form-label small text-muted">Suggested Core Topics</label>
+            <div class="d-flex flex-wrap gap-1">
+              <button type="button" class="btn btn-sm btn-outline-custom py-1 px-2" onclick="setTopic('Blockchain')">Blockchain</button>
+              <button type="button" class="btn btn-sm btn-outline-custom py-1 px-2" onclick="setTopic('Neural Networks')">Neural Networks</button>
+              <button type="button" class="btn btn-sm btn-outline-custom py-1 px-2" onclick="setTopic('Operating Systems')">Operating Systems</button>
+              <button type="button" class="btn btn-sm btn-outline-custom py-1 px-2" onclick="setTopic('Database Management Systems')">DBMS</button>
+              <button type="button" class="btn btn-sm btn-outline-custom py-1 px-2" onclick="setTopic('Computer Networks')">Computer Networks</button>
+            </div>
+          </div>
+
+          <!-- Visual Type Selector -->
+          <div class="mb-4">
+            <label class="form-label">Visual Diagram Type</label>
+            <div class="btn-group w-100" role="group">
+              <input type="radio" class="btn-check" name="visualType" id="visFlowchart" value="flowchart" checked>
+              <label class="btn btn-outline-custom" for="visFlowchart">Flowchart</label>
+
+              <input type="radio" class="btn-check" name="visualType" id="visMindmap" value="mindmap">
+              <label class="btn btn-outline-custom" for="visMindmap">Mind Map</label>
+            </div>
+          </div>
+
+          <button type="submit" id="generateVisBtn" class="btn btn-primary-gradient w-100 py-2 fs-6">
+            <span id="visSpinner" class="spinner-border spinner-border-sm d-none me-2"></span>
+            <i class="bi bi-bezier2"></i>
+            <span>Generate Visual Explainer</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Previously Generated Visuals -->
+      <div class="study-card mt-4">
+        <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-collection-play text-info me-2"></i> Saved Diagrams</span>
+          <button class="btn btn-sm btn-link text-primary p-0" onclick="loadSavedVisuals()">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </h5>
+        <div id="savedVisualsList" class="list-group list-group-flush bg-transparent" style="max-height: 350px; overflow-y: auto;">
+          <div class="text-center py-3 text-muted small">Loading saved visuals...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Visualization Display Pane -->
+    <div class="col-lg-8">
+      <div class="study-card h-100 d-flex flex-column">
+        <!-- Display Header with Export Actions -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-3 border-bottom border-secondary-subtle">
+          <div>
+            <h5 class="fw-bold mb-0 text-light" id="displayTopicTitle">Visual Canvas</h5>
+            <span class="small text-muted" id="displayTopicSub">Ready to visualize</span>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-custom" id="downloadSvgBtn" onclick="downloadDiagramSvg()" disabled>
+              <i class="bi bi-file-earmark-code me-1"></i> Download SVG
+            </button>
+            <button class="btn btn-sm btn-secondary-gradient" id="downloadPngBtn" onclick="downloadDiagramPng()" disabled>
+              <i class="bi bi-download me-1"></i> Download PNG
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty Prompt -->
+        <div id="emptyVisualPrompt" class="text-center py-5 my-auto text-muted">
+          <i class="bi bi-diagram-3 fs-1 d-block mb-3 text-secondary"></i>
+          <h5>No visual generated yet</h5>
+          <p class="small text-muted">Enter a concept topic on the left or select a pre-configured suggestion to generate diagrams.</p>
+        </div>
+
+        <!-- Render Container -->
+        <div id="visualDisplayArea" class="d-none flex-grow-1 overflow-auto">
+          <!-- Nav Tabs: Flowchart / Schematic / Step-by-Step -->
+          <ul class="nav nav-pills mb-3" id="visTabs" role="tablist">
+            <li class="nav-item">
+              <button class="nav-link active py-1 px-3 small" id="tabFlowchartBtn" data-bs-toggle="pill" data-bs-target="#tabFlowchart">
+                <i class="bi bi-bezier2 me-1"></i> Interactive Diagram
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link py-1 px-3 small" id="tabSchematicBtn" data-bs-toggle="pill" data-bs-target="#tabSchematic">
+                <i class="bi bi-image me-1"></i> System Illustration
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link py-1 px-3 small" id="tabStepsBtn" data-bs-toggle="pill" data-bs-target="#tabSteps">
+                <i class="bi bi-list-ol me-1"></i> Step-by-Step Workflow
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="visTabContent">
+            <!-- Mermaid Flowchart / Mind Map Tab -->
+            <div class="tab-pane fade show active" id="tabFlowchart">
+              <div class="p-3 rounded-3 text-center" id="mermaidContainer" style="background-color: var(--bg-input); min-height: 380px; overflow-x: auto;">
+                <div class="mermaid" id="mermaidRenderBox"></div>
+              </div>
+            </div>
+
+            <!-- SVG System Illustration Tab -->
+            <div class="tab-pane fade" id="tabSchematic">
+              <div class="p-3 rounded-3 text-center" style="background-color: var(--bg-input);">
+                <img id="schematicImg" src="" alt="System Diagram" class="img-fluid rounded-3 shadow-sm" style="max-height: 400px;">
+                <div class="small text-muted mt-2">Precision vector SVG generated for this concept.</div>
+              </div>
+            </div>
+
+            <!-- Step-by-Step Breakdown Tab -->
+            <div class="tab-pane fade" id="tabSteps">
+              <div class="d-flex flex-column gap-2" id="stepsCardsContainer"></div>
+            </div>
+          </div>
+
+          <!-- Concept Explanation & Real World Example -->
+          <div class="mt-4 pt-3 border-top border-secondary-subtle">
+            <div class="row g-3">
+              <div class="col-md-7">
+                <h6 class="fw-bold text-primary"><i class="bi bi-book me-1"></i> Conceptual Breakdown</h6>
+                <div id="visExplanationText" class="small text-light content-viewer"></div>
+              </div>
+              <div class="col-md-5">
+                <div class="p-3 rounded-3 h-100" style="background: rgba(0, 201, 167, 0.08); border-left: 3px solid var(--secondary);">
+                  <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-building me-1"></i> Real-World Application</h6>
+                  <div id="visRealWorldText" class="small text-light"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentVisual = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSavedVisuals();
+});
+
+function setTopic(name) {
+  document.getElementById('topicInput').value = name;
+  document.getElementById('visualizerForm').dispatchEvent(new Event('submit'));
+}
+
+/* Submit visual generator form */
+document.getElementById('visualizerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const topic = document.getElementById('topicInput').value.trim();
+  if (!topic) return;
+
+  const btn = document.getElementById('generateVisBtn');
+  const spinner = document.getElementById('visSpinner');
+  const alertBox = document.getElementById('visAlert');
+
+  btn.disabled = true;
+  spinner.classList.remove('d-none');
+  alertBox.classList.add('d-none');
+
+  const vType = document.querySelector('input[name="visualType"]:checked').value;
+
+  try {
+    const res = await fetch('/api/visuals/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: topic, visual_type: vType })
+    });
+    const json = await res.json();
+
+    if (json.success) {
+      renderVisualResult(json.data);
+      loadSavedVisuals();
+      showToast('Visual learning artifacts generated!', 'success');
+    } else {
+      alertBox.textContent = json.message || 'Generation failed';
+      alertBox.classList.remove('d-none');
+    }
+  } catch (err) {
+    alertBox.textContent = 'Server connection error';
+    alertBox.classList.remove('d-none');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('d-none');
+  }
+});
+
+/* Render Visual Results with Mermaid */
+async function renderVisualResult(data) {
+  currentVisual = data;
+
+  document.getElementById('emptyVisualPrompt').classList.add('d-none');
+  document.getElementById('visualDisplayArea').classList.remove('d-none');
+
+  document.getElementById('displayTopicTitle').textContent = data.topic;
+  document.getElementById('displayTopicSub').textContent = `${data.visual_type.toUpperCase()} • Generated with AI Study Mate`;
+
+  // Explanation and real world text
+  document.getElementById('visExplanationText').innerHTML = data.explanation.replace(/\n\n/g, '<div class="my-2"></div>');
+  document.getElementById('visRealWorldText').textContent = data.real_world_example || 'Applied across enterprise production systems.';
+
+  // Render Steps
+  const stepsBox = document.getElementById('stepsCardsContainer');
+  const steps = data.steps || [];
+  stepsBox.innerHTML = steps.map((s, idx) => `
+    <div class="p-2 px-3 rounded-2 d-flex align-items-center gap-3" style="background-color: var(--bg-input); border: 1px solid var(--border-color);">
+      <span class="badge bg-primary rounded-circle" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
+      <span class="small text-light">${escapeHtml(s)}</span>
+    </div>
+  `).join('');
+
+  // SVG schematic
+  if (data.image_url) {
+    document.getElementById('schematicImg').src = data.image_url;
+  }
+
+  // Render Mermaid Diagram
+  const code = (data.visual_type === 'mindmap' && data.mermaid_mindmap) ? data.mermaid_mindmap : (data.mermaid_flowchart || data.diagram_code);
+  const renderBox = document.getElementById('mermaidRenderBox');
+  renderBox.removeAttribute('data-processed');
+  renderBox.innerHTML = code;
+
+  try {
+    await mermaid.run({ nodes: [renderBox] });
+  } catch (e) {
+    console.error('Mermaid render error:', e);
+    renderBox.innerHTML = `<pre class="text-warning font-monospace p-3">${escapeHtml(code)}</pre>`;
+  }
+
+  // Enable download actions
+  document.getElementById('downloadSvgBtn').disabled = false;
+  document.getElementById('downloadPngBtn').disabled = false;
+}
+
+/* Download Diagram as SVG */
+function downloadDiagramSvg() {
+  const svg = document.querySelector('#mermaidRenderBox svg');
+  if (!svg) {
+    showToast('No active SVG found to download', 'warning');
+    return;
+  }
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentVisual ? currentVisual.topic : 'diagram'}.svg`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('SVG diagram downloaded!', 'success');
+}
+
+/* Download Diagram as PNG via Canvas */
+function downloadDiagramPng() {
+  const svg = document.querySelector('#mermaidRenderBox svg');
+  if (!svg) {
+    showToast('No active diagram found', 'warning');
+    return;
+  }
+
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width || 800;
+    canvas.height = img.height || 500;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#101426';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+
+    const pngUrl = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = pngUrl;
+    a.download = `${currentVisual ? currentVisual.topic : 'diagram'}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('PNG diagram downloaded!', 'success');
+  };
+
+  img.src = url;
+}
+
+/* Load user's saved visuals */
+async function loadSavedVisuals() {
+  const container = document.getElementById('savedVisualsList');
+  try {
+    const res = await fetch('/api/visuals');
+    const json = await res.json();
+    if (json.success && json.data.length > 0) {
+      container.innerHTML = json.data.map(v => `
+        <div class="list-group-item bg-transparent text-light border-secondary-subtle px-0 py-2 d-flex justify-content-between align-items-center">
+          <div class="text-truncate" style="max-width: 75%; cursor: pointer;" onclick="loadSingleVisual(${v.id})">
+            <div class="fw-semibold text-truncate small">${escapeHtml(v.topic)}</div>
+            <small class="text-muted">${v.visual_type.toUpperCase()} • ${v.created_at}</small>
+          </div>
+          <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteVisual(${v.id})" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      `).join('');
+    } else {
+      container.innerHTML = '<div class="text-center py-3 text-muted small">No saved diagrams yet.</div>';
+    }
+  } catch (e) {
+    container.innerHTML = '<div class="text-center py-3 text-danger small">Error loading visuals</div>';
+  }
+}
+
+async function loadSingleVisual(id) {
+  try {
+    const res = await fetch(`/api/visuals/${id}`);
+    const json = await res.json();
+    if (json.success) {
+      renderVisualResult(json.data);
+    }
+  } catch (e) {
+    showToast('Error loading visual', 'danger');
+  }
+}
+
+async function deleteVisual(id) {
+  if (!confirm('Delete this saved diagram?')) return;
+  try {
+    const res = await fetch(`/api/visuals/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Diagram deleted', 'info');
+      loadSavedVisuals();
+    }
+  } catch (e) {
+    showToast('Error deleting diagram', 'danger');
+  }
+}
+</script>
+{% endblock %}
